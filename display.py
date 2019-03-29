@@ -1,4 +1,4 @@
-﻿from os import path
+from os import path
 import re
 from fluent_tui.utils import journal_writer
 
@@ -7,6 +7,8 @@ class Display():
     def __init__(self):
         self.base = '/display/'
         self.commands = []
+        self.picture_extension = '.ps'
+        self.xy = [0,0]
     
     def write_journal(self, flush=True, **kwargs):
         journal_writer(self.commands, **kwargs)
@@ -15,7 +17,12 @@ class Display():
         
     def add(self,*commands):
         self.commands.append(self.base + ' '.join([str(cmd) for cmd in commands]) + '\n')
-
+    
+    def add_raw(self,commands):
+        if not isinstance(commands,list):
+            commands = [commands]
+        self.commands.append('\n'.join([str(cmd) for cmd in commands]) + '\n')
+        
     def add_custom_vector():
         """Adds new custom vector definition."""
 
@@ -67,11 +74,13 @@ class Display():
     def multigrid_coarsening():
         """Displays a coarse mesh level from the last multigrid coarsening."""
 
-    def objects():
+    def objects(self,**kwargs):
         """Enters the graphics objects menu."""
+        self.base = '/display/object/'
 
-        def add_to_graphics():
+        def add_to_graphics(object):
             """Adds a contour, vector, pathline, particle track, scene, or mesh plot to the existing content in the graphics window."""
+            self.add('add-to-graphics/'+object)
 
         def copy():
             """Copies an existing contour, vector, pathline, particle track, scene, mesh, or XY plot definition."""
@@ -82,11 +91,28 @@ class Display():
         def delete():
             """Deletes a contour, vector, pathline, particle track, scene, mesh, or XY plot definition."""
 
-        def display():
+        def display(object):
             """Displays a contour, vector, pathline, particle track, scene, mesh, or XY plot in the graphic windows replacing the existing content."""
-
+            self.add('display/'+object)
         def edit():
             """Edits a contour, vector, pathline, particle track, scene, or mesh plot definition."""
+            
+        # Switch Case Setup    
+        switch = {
+            'add_to_graphics':add_to_graphics,
+            'copy':copy,
+            'create':create,
+            'delete':delete,
+            'display':display,
+            'edit':edit,
+        }
+    
+        # Disperse kwargs to functions
+        for key,value in kwargs.items():
+            switch[key](value)
+            
+        # Reset self.base
+        self.base = '/display/'
 
     def open_window():
         """Opens a graphics window."""
@@ -143,7 +169,7 @@ class Display():
         """Generates a “hardcopy" of the active window."""
         
         if filename is None:
-            filename = path.join(path.expanduser('~'),'Desktop','image.png')
+            filename = path.join(path.expanduser('~'),'Desktop','image.ps')
         
         if ((filename[0]!='"') or (filename[0]!="'")) and (' ' in filename):
             filename = '"'+filename+'"'
@@ -153,6 +179,9 @@ class Display():
         else:
             ow = 'n'
     
+        root,ext = path.splitext(filename)
+        self.picture_options(driver=ext)
+        filename = root+self.picture_extension
         self.add('save-picture/', filename, ow)
         
     def picture_options(self, **kwargs):
@@ -182,29 +211,37 @@ class Display():
             """Sets the resolution for EPS and Postscript files; specifies the resolution in dots per inch (DPI) instead of setting the width and height."""
             self.add('dpi/', value)
             
-        def set_driver():
+        def set_driver(ext='ps'):
             """Enters the set hardcopy driver menu."""
-
+            ext = ext.strip('.')
+            options = {
+                'eps':'eps',
+                'ppm':'ppm',
+                'hsf':'hsf',
+                'png':'png',
+                'tiff':'tiff',
+                'tif':'tiff',
+                'jpg':'jpeg',
+                'vrml':'vrml',
+                'ps':'post-script',
+            }
+            
+            if ext in options.keys():
+                if (re.search('driver/'+options[ext],' '.join(self.commands)) is None):
+                    self.add('driver/'+options[ext])
+                self.picture_extension = '.'+ext
+            else:
+                print('Can not use extension "'+ext+'". Defaulting to "ps", please use one of the following next time:')
+                print(options.keys())
+                if (re.search('driver/png',' '.join(self.commands)) is None):
+                    self.add('driver/png')
+                self.picture_extension = '.png'
+                
             def dump_window():
                 """Sets the command used to dump the graphics window to a file."""
 
-            def eps():
-                """Produces encapsulated PostScript (EPS) output for hardcopies."""
-
-            def hsf():
-                """Produces HOOPS Visualize Stream Format (HSF) output for hardcopies."""
-
-            def jpeg():
-                """Produces JPEG output for hardcopies. (This is the default file type.)"""
-
-            def list():
-                """Lists the current hardcopy driver."""
-
             def options():
                 """Sets the hardcopy options. Available options are: “no gamma correction", disables gamma correction of colors; “pen speed = f", where f is a real number in [0,1]; “physical size = (width, height)", where width and height are the actual measurements of the printable area of the page in centimeters; “subscreen = (left, right, bottom, top)", where left, right, bottom, and top are numbers in [_1,1] describing a subwindow on the page in which to place the hardcopy. The options may be combined by separating them with commas. The pen speed option is only meaningful to the HPGL driver."""
-
-            def png():
-                """Uses PNG output for hardcopies."""
 
             def post_format():
                 """Enters the PostScript driver format menu."""
@@ -221,23 +258,17 @@ class Display():
                 def vector():
                     """Enables the standard vector file."""
 
-            def post_script():
-                """Produces PostScript output for hardcopies."""
-
-            def ppm():
-                """Produces PPM output for hardcopies."""
-
-            def tiff():
-                """Produces TIFF output for hardcopies."""
-
-            def vrml():
-                """Uses VRML output for hardcopies."""
-
         def invert_background():
             """Exchanges foreground or background colors for hardcopy."""
 
-        def set_landscape():
+        def set_landscape(value='y'):
             """Plots hardcopies in landscape or portrait orientation."""
+            if isinstance(value,bool):
+                if value:
+                    value = 'y'
+                else:
+                    value = 'n'
+            self.add('landscape '+value)
 
         def set_preview():
             """Applies the settings of the color_mode, invert_background, and landscape options to the currently active graphics window to preview the appearance of printed hardcopies."""
@@ -255,7 +286,12 @@ class Display():
                 use_window_resolution(False)
                 
             self.add('x-resolution/',value)
-            
+            self.xy[0] = value
+            if (0 not in self.xy):
+                if (self.xy[0]>self.xy[1]):
+                    set_landscape('y')
+                else:
+                    set_landscape('n')
             
         def set_y_resolution(value):
             """Sets the height of raster_formatted images in pixels (0 implies current window size)."""
@@ -263,6 +299,12 @@ class Display():
                 use_window_resolution(False)
                 
             self.add('y-resolution',value)
+            self.xy[1] = value
+            if (0 not in self.xy):
+                if (self.xy[0]>self.xy[1]):
+                    set_landscape('y')
+                else:
+                    set_landscape('n')
                 
         # Switch Case Setup    
         switch = {
@@ -274,6 +316,7 @@ class Display():
             'use_window_resolution':use_window_resolution,
             'x':set_x_resolution,
             'y':set_y_resolution,
+            'driver':set_driver,
         }
     
         # Disperse kwargs to functions

@@ -29,10 +29,10 @@ def journal_writer(commands, filename=None, append=True, version='19.1'):
     with open(filename,write) as file:
         if write == 'w':
             file.write('; This document was created by fluentTUI\n\n')
-            file.write('/file/set-tui-version "'+str(version)+'"\n')
+            #file.write('/file/set-tui-version "'+str(version)+'"\n')
         file.write(''.join(commands))
         file.write('\n; Last Updated on ' + datetime.strftime(datetime.now(),'%c') +' by fluentTUI\n')
         
     outcommand = '/file/read-journal/ "'+filename+'"'
-    copy_to_clipboard(outcommand+'\n')
-    print(outcommand+'\\n')
+    copy_to_clipboard(outcommand)
+    print(outcommand)
