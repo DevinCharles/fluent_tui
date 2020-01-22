@@ -76,22 +76,23 @@ def integrate(x,y,z=None):
     else:
         return simps(simps(z,x[0,:]),y[:,0])
 
-def fluent_connect(verbose=False):
+def fluent_connect(watch_dir=None, verbose=False):
     '''Tool for connecting to the fluent and cx process - WIP'''
     import psutil
     ##TODO: handle ModuleNotFoundError for psutil with gui open dir
     try:
         flu_pid = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if 'fluent' in p.info['name']][0]['pid']
+        
+        flu_dict = psutil.Process(flu_pid).as_dict()
+        flu_version = flu_dict['environ']['FLUENT_PROD_DIR'].split('\\')[-1].split('fluent')[1].replace('.','')
+        flu_cwd = flu_dict['cwd']
+
+        cx_pid = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if 'cx'+flu_version in p.info['name']][0]['pid']
+        cx_dict = psutil.Process(cx_pid).as_dict()
+        
     except IndexError:
         print('Could not connect to Fluent')
         raise
-        
-    flu_dict = psutil.Process(flu_pid).as_dict()
-    flu_version = flu_dict['environ']['FLUENT_PROD_DIR'].split('\\')[-1].split('fluent')[1].replace('.','')
-    flu_cwd = flu_dict['cwd']
-
-    cx_pid = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if 'cx'+flu_version in p.info['name']][0]['pid']
-    cx_dict = psutil.Process(cx_pid).as_dict()
     
     if verbose:
         print('Connected to Fluent')
@@ -143,7 +144,7 @@ def parse_residuals(fname):
         print('It appears no iterations have been performed yet.')
         return
     
-    names = [re.sub('\s+',' ',re.search('^\s+iter.*$',name,
+    names = [re.sub('\s+',' ',re.search('^\s{0,4}iter.*$',name,
         re.M).group().replace('/iter',' iter-left')).strip().split(' ') for
         name in all_names]
     # Checking for a change in the number of column names (we've changed the
